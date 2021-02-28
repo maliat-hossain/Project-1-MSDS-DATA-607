@@ -1,0 +1,137 @@
+---
+title: "Project 1"
+author: "Maliat"
+date: "2/25/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd("C:/Users/malia/OneDrive/Desktop/MSDS DATA 607")
+```
+
+## R Markdown
+```{r include=FALSE}
+library(tidyverse)
+library(stringr)
+library(magrittr)
+library(foreign)
+library(descr)
+library(lubridate)
+library(rebus)
+library(glue)
+```
+
+
+```{r}
+Prac_chess_datasets<-read.delim("https://raw.githubusercontent.com/maliat-hossain/chess-data/main/tournamentinfo.txt",header = FALSE, sep = "|")
+```
+
+### In this project,  a text file is given with chess tournament results where the information has some structure. The objective  is to create an R Markdown file that generates a .CSV file (that could for example be imported into a SQL database)with the following information for all of the players:Player’s Name, Player’s State, Total Number of Points, Player’s Pre-Rating, and Average Pre Chess Rating of OpponentsFor the first player, the information would be:
+### Gary Hua, ON, 6.0, 1794, 1605
+
+### A new dataframe is created. Player number,player name ,player state,player points, player pre-rating was extracted by implementing string manipulation  from the given datasets.
+
+
+```{r}
+
+# 1. Loop over the dataset to get the Valid values and set information under variables. 
+# 2. Create a new Dataframe and save those variables under different column. 
+# 3. Calculte the ELO score of the opponent. 
+
+
+refined_chess_datasets = NULL
+
+for (i in 1:nrow(Prac_chess_datasets)){
+  PlayerNumber<- suppressWarnings(as.numeric(Prac_chess_datasets$V1[i]))
+  isValid <- grepl("[-]?[0-9]+[.]?[0-9]*|[-]?[0-9]+[L]?|[-]?[0-9]+[.]?[0-9]*[eE][0-9]+", PlayerNumber)
+
+  if(isValid){
+    PlayerName <- Prac_chess_datasets$V2[i]
+    PlayerPoints <- Prac_chess_datasets$V3[i]
+    PlayerState <- Prac_chess_datasets$V1[i+1]
+    PlayerDetails <- Prac_chess_datasets$V2[i+1]
+    PlayerRankSplit <- strsplit(PlayerDetails, split = "/")[[1]]
+    PlayerRank <- PlayerRankSplit[[1]]
+    PlayerRating <-PlayerRankSplit[[2]]
+    
+    PlayerRatingNew <- str_remove_all(PlayerRating, "[R:]")
+    PlayerRatingSplit <- strsplit(PlayerRatingNew, split = "->")[[1]]
+    PlayerPreRating <- PlayerRatingSplit[[1]]
+   
+   
+    refined_chess_datasets = rbind(refined_chess_datasets, data.frame(PlayerNumber, PlayerName, PlayerState, PlayerPoints, PlayerPreRating))
+    
+  }
+    
+}
+
+
+```
+
+### Captured ratings of opponent for each round, and stored it in a new data frame. Measured the mean value from the new data frame. For this purpose string extract command was implemented.
+```{r}
+
+refined_chess_datasets_round = NULL
+
+for (i in 1:nrow(Prac_chess_datasets)){
+  PlayerNumber<- suppressWarnings(as.numeric(Prac_chess_datasets$V1[i]))
+  isValid <- grepl("[-]?[0-9]+[.]?[0-9]*|[-]?[0-9]+[L]?|[-]?[0-9]+[.]?[0-9]*[eE][0-9]+", PlayerNumber)
+
+  if(isValid){
+    PlayerName <- Prac_chess_datasets$V2[i]
+    
+    Round1 <- as.numeric(str_extract(Prac_chess_datasets$V4[i], "[[:digit:]]+"))
+    Round2 <- as.numeric(str_extract(Prac_chess_datasets$V5[i], "[[:digit:]]+"))
+    Round3 <- as.numeric(str_extract(Prac_chess_datasets$V6[i], "[[:digit:]]+"))
+    Round4 <- as.numeric(str_extract(Prac_chess_datasets$V7[i], "[[:digit:]]+"))
+    Round5 <- as.numeric(str_extract(Prac_chess_datasets$V8[i], "[[:digit:]]+"))
+    Round6 <- as.numeric(str_extract(Prac_chess_datasets$V9[i], "[[:digit:]]+"))
+    Round7 <- as.numeric(str_extract(Prac_chess_datasets$V10[i], "[[:digit:]]+"))
+    
+    Round1OppPreRating <- as.numeric((sub("P.*", "\\1", refined_chess_datasets$PlayerPreRating[Round1])))
+    Round2OppPreRating <- as.numeric((sub("P.*", "\\1", refined_chess_datasets$PlayerPreRating[Round2])))
+    Round3OppPreRating <- as.numeric((sub("P.*", "\\1", refined_chess_datasets$PlayerPreRating[Round3])))
+    Round4OppPreRating <- as.numeric((sub("P.*", "\\1", refined_chess_datasets$PlayerPreRating[Round4])))
+    Round5OppPreRating <- as.numeric((sub("P.*", "\\1", refined_chess_datasets$PlayerPreRating[Round5])))
+    Round6OppPreRating <- as.numeric((sub("P.*", "\\1", refined_chess_datasets$PlayerPreRating[Round6])))
+    Round7OppPreRating <- as.numeric((sub("P.*", "\\1", refined_chess_datasets$PlayerPreRating[Round7])))
+    
+    MeanOppRating<- (mean(c(Round1OppPreRating, Round2OppPreRating, Round3OppPreRating, Round4OppPreRating, Round5OppPreRating, Round6OppPreRating, Round7OppPreRating), na.rm=TRUE))
+    
+    refined_chess_datasets_round = rbind(refined_chess_datasets_round, data.frame(PlayerNumber, PlayerName, Round1OppPreRating, Round2OppPreRating, Round3OppPreRating, Round4OppPreRating, Round5OppPreRating, Round6OppPreRating, Round7OppPreRating, MeanOppRating))
+    
+    
+    
+  }
+  
+}
+
+
+```
+
+```{r}
+head(refined_chess_datasets_round)
+```
+
+### Created final data frame with all the required column. Also, exported data to a CSV file.
+
+```{r}
+# Add Average Opponents Rating to the Existing DataFrame. 
+
+FinalChessData <- data.frame("PlayerNumber" = refined_chess_datasets$PlayerNumber, "PlayerName" =refined_chess_datasets$PlayerName, "State" = refined_chess_datasets$PlayerState, "Points" = refined_chess_datasets$PlayerPoints, "Pre-Rating" = refined_chess_datasets$PlayerPreRating, "OpponentsAvgRating"  = refined_chess_datasets_round$MeanOppRating)
+
+
+head(FinalChessData)
+
+write.csv(FinalChessData,"C:/Users/malia/OneDrive/Desktop/MSDS DATA 607/FinalChessData.csv", row.names = FALSE)
+
+
+```
+
+
+
+
